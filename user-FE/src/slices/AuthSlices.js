@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk} from '@reduxjs/toolkit'; 
 import axios from '../config/axios'; 
-import { redirect } from 'react-router-dom';
+
 
 export const registerUser = createAsyncThunk('auth/registerUser', async ({ formData, redirect} ,{rejectWithValue}) => {
     try {
@@ -18,11 +18,19 @@ export const registerUser = createAsyncThunk('auth/registerUser', async ({ formD
 
 export const loginUser =createAsyncThunk('auth/loginUser',async({formData,redirect},{rejectWithValue})=>{
     try{
+        //will check if login credential is correct or not
         const response=await axios.post('/login',formData)
         alert('login successful')
         console.log(response.data)
         localStorage.setItem('token',response.data.token)
+
+        const userResponse=await axios.get('/account',{headers:{Authorization:localStorage.getItem('token')}})
         redirect();
+        console.log(userResponse.data);
+
+        return userResponse.data;
+        
+
     } catch (err) {
        const msg=err.response.data.error
        alert(msg)
@@ -31,6 +39,19 @@ export const loginUser =createAsyncThunk('auth/loginUser',async({formData,redire
     }
 })
 
+export const fetchUser=createAsyncThunk('auth/fetchUser',async(_,{rejectWithValue})=>{
+    try{
+        const response=await axios.get('/account',{headers:{Authorization:localStorage.getItem('token')}})
+        console.log(response.data)
+    }
+    catch(err){
+        const msg =err.response.data.error
+        return rejectWithValue(msg)
+    }
+})
+
+
+
 const authSlice = createSlice({
     name: 'auth', 
     initialState: {
@@ -38,7 +59,12 @@ const authSlice = createSlice({
         isLoggedIn: false, 
         error: null 
     },
-    reducers: {},
+    reducers: {
+        logout:(state)=>{
+            state.user=null;
+            state.isLoggedIn=false;
+        }
+    },
     extraReducers: (builder) => {
         builder
             .addCase(registerUser.rejected, (state, action) => {
@@ -56,7 +82,23 @@ const authSlice = createSlice({
                     state.error=action.payload
                 }
             })
+            .addCase(loginUser.fulfilled,(state,action)=>{
+                    state.user=action.payload
+                    state.isLoggedIn=true
+                    state.error=null
+            })
+            .addCase(fetchUser.rejected,(state,action)=>{
+                    if(action.payload){
+                        state.error=action.payload
+                    }       
+            })
+            .addCase(fetchUser.fulfilled,(state,action)=>{
+                    state.user=action.payload
+                    state.isLoggedIn=true
+                    state.error=null
+            })
     }
 });
 
 export default authSlice.reducer;
+export const {logout}=authSlice.actions;
